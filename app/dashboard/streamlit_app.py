@@ -4,6 +4,8 @@ import streamlit as st
 import pandas as pd
 import json
 from datetime import datetime
+from app.collectors.valora_collector import get_valora_news
+from app.services.news_utils import save_news_to_db
 
 # Agrega la raíz del proyecto al path
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "../..")))
