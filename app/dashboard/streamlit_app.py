@@ -4,8 +4,12 @@ import streamlit as st
 import pandas as pd
 import json
 from datetime import datetime
-from app.collectors.valora_collector import get_valora_news
+
+from app.db.connection import get_connection, create_table
 from app.services.news_utils import save_news_to_db
+from app.collectors.valora_collector import get_valora_news
+from app.collectors.investing_collector import get_investing_news
+from app.collectors.bloomberg_collector import get_bloomberg_news
 
 # Agrega la raíz del proyecto al path
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "../..")))
@@ -147,6 +151,42 @@ def load_data():
         rows = cursor.fetchall()
     except:
         rows = []
+
+def auto_load_news_if_empty():
+    create_table()
+
+    conn = get_connection()
+    cursor = conn.cursor()
+
+    try:
+        cursor.execute("SELECT COUNT(*) FROM news")
+        count = cursor.fetchone()[0]
+    except Exception:
+        count = 0
+
+    conn.close()
+
+    if count == 0:
+        all_news = []
+
+        try:
+            all_news.extend(get_valora_news())
+        except Exception as e:
+            st.warning(f"No se pudieron cargar noticias de Valora Analitik: {e}")
+
+        try:
+            all_news.extend(get_investing_news())
+        except Exception as e:
+            st.warning(f"No se pudieron cargar noticias de Investing: {e}")
+
+        try:
+            all_news.extend(get_bloomberg_news())
+        except Exception as e:
+            st.warning(f"No se pudieron cargar noticias de Bloomberg: {e}")
+
+        if all_news:
+            save_news_to_db(all_news)
+            st.cache_data.clear()    
 
     conn.close()
 
@@ -701,6 +741,7 @@ def main():
     load_custom_css()
     render_header()
 
+    auto_load_news_if_empty()
     df = load_data()
 
     if df.empty:
