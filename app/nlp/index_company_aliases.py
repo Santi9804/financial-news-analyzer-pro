@@ -1,0 +1,450 @@
+from collections import defaultdict
+
+
+def normalize_aliases(*aliases):
+    seen = set()
+    result = []
+
+    for alias in aliases:
+        if alias and alias.strip():
+            clean = alias.strip().lower()
+            if clean not in seen:
+                seen.add(clean)
+                result.append(clean)
+
+    return result
+
+
+INDEX_COMPANIES = {
+    "S&P 500": {
+        "Apple": normalize_aliases("apple"),
+        "Microsoft": normalize_aliases("microsoft"),
+        "Alphabet": normalize_aliases("alphabet", "google", "google llc"),
+        "Amazon": normalize_aliases("amazon", "amazon.com"),
+        "Meta": normalize_aliases("meta", "meta platforms", "facebook"),
+        "Nvidia": normalize_aliases("nvidia"),
+        "Tesla": normalize_aliases("tesla"),
+        "Berkshire Hathaway": normalize_aliases("berkshire hathaway", "berkshire"),
+        "JPMorgan": normalize_aliases("jpmorgan", "jp morgan", "j.p. morgan"),
+        "Bank of America": normalize_aliases("bank of america", "bofa", "banco de america"),
+        "Wells Fargo": normalize_aliases("wells fargo"),
+        "Goldman Sachs": normalize_aliases("goldman sachs"),
+        "Morgan Stanley": normalize_aliases("morgan stanley"),
+        "Visa": normalize_aliases("visa"),
+        "Mastercard": normalize_aliases("mastercard"),
+        "Johnson & Johnson": normalize_aliases("johnson & johnson", "j&j"),
+        "Procter & Gamble": normalize_aliases("procter & gamble", "p&g"),
+        "Coca-Cola": normalize_aliases("coca-cola", "coca cola"),
+        "PepsiCo": normalize_aliases("pepsico", "pepsi"),
+        "Walmart": normalize_aliases("walmart"),
+        "Costco": normalize_aliases("costco"),
+        "Home Depot": normalize_aliases("home depot"),
+        "McDonald's": normalize_aliases("mcdonald's", "mcdonalds"),
+        "Netflix": normalize_aliases("netflix"),
+        "Adobe": normalize_aliases("adobe"),
+        "Salesforce": normalize_aliases("salesforce"),
+        "Oracle": normalize_aliases("oracle"),
+        "Cisco": normalize_aliases("cisco"),
+        "IBM": normalize_aliases("ibm", "international business machines"),
+        "Intel": normalize_aliases("intel"),
+        "AMD": normalize_aliases("amd", "advanced micro devices"),
+        "Qualcomm": normalize_aliases("qualcomm"),
+        "Pfizer": normalize_aliases("pfizer"),
+        "Merck": normalize_aliases("merck"),
+        "AbbVie": normalize_aliases("abbvie"),
+        "Chevron": normalize_aliases("chevron"),
+        "ExxonMobil": normalize_aliases("exxonmobil", "exxon mobil", "exxon"),
+        "UnitedHealth": normalize_aliases("unitedhealth", "unitedhealth group"),
+        "American Express": normalize_aliases("american express", "amex"),
+        "BlackRock": normalize_aliases("blackrock"),
+        "Palantir": normalize_aliases("palantir"),
+        "Broadcom": normalize_aliases("broadcom"),
+        "Booking Holdings": normalize_aliases("booking", "booking holdings", "booking.com"),
+        "ServiceNow": normalize_aliases("servicenow"),
+        "Intuit": normalize_aliases("intuit"),
+        "Uber": normalize_aliases("uber"),
+        "Airbnb": normalize_aliases("airbnb"),
+        "PayPal": normalize_aliases("paypal"),
+        "Micron": normalize_aliases("micron", "micron technology"),
+        "Texas Instruments": normalize_aliases("texas instruments", "ti"),
+        "GE Aerospace": normalize_aliases("ge aerospace", "general electric", "ge"),
+        "Caterpillar": normalize_aliases("caterpillar"),
+        "Boeing": normalize_aliases("boeing"),
+        "Disney": normalize_aliases("disney", "walt disney"),
+        "Nike": normalize_aliases("nike"),
+        "Target": normalize_aliases("target"),
+        "Starbucks": normalize_aliases("starbucks"),
+        "Lowe's": normalize_aliases("lowe's", "lowes"),
+        "Amgen": normalize_aliases("amgen"),
+        "Eli Lilly": normalize_aliases("eli lilly", "lilly"),
+        "Abbott": normalize_aliases("abbott", "abbott laboratories"),
+        "Thermo Fisher": normalize_aliases("thermo fisher", "thermo fisher scientific"),
+        "Danaher": normalize_aliases("danaher"),
+        "Stryker": normalize_aliases("stryker"),
+    },
+
+    "Nasdaq": {
+        "Apple": normalize_aliases("apple"),
+        "Microsoft": normalize_aliases("microsoft"),
+        "Alphabet": normalize_aliases("alphabet", "google", "google llc"),
+        "Amazon": normalize_aliases("amazon", "amazon.com"),
+        "Meta": normalize_aliases("meta", "meta platforms", "facebook"),
+        "Nvidia": normalize_aliases("nvidia"),
+        "Tesla": normalize_aliases("tesla"),
+        "Netflix": normalize_aliases("netflix"),
+        "Adobe": normalize_aliases("adobe"),
+        "Salesforce": normalize_aliases("salesforce"),
+        "Cisco": normalize_aliases("cisco"),
+        "Intel": normalize_aliases("intel"),
+        "AMD": normalize_aliases("amd", "advanced micro devices"),
+        "Qualcomm": normalize_aliases("qualcomm"),
+        "Broadcom": normalize_aliases("broadcom"),
+        "Costco": normalize_aliases("costco"),
+        "PepsiCo": normalize_aliases("pepsico", "pepsi"),
+        "Starbucks": normalize_aliases("starbucks"),
+        "Booking Holdings": normalize_aliases("booking", "booking holdings", "booking.com"),
+        "Airbnb": normalize_aliases("airbnb"),
+        "Uber": normalize_aliases("uber"),
+        "Palantir": normalize_aliases("palantir"),
+        "MicroStrategy": normalize_aliases("microstrategy", "strategy"),
+        "Axon Enterprise": normalize_aliases("axon", "axon enterprise"),
+        "ASML": normalize_aliases("asml"),
+        "Pinduoduo": normalize_aliases("pinduoduo", "pdd"),
+        "Intuit": normalize_aliases("intuit"),
+        "Applied Materials": normalize_aliases("applied materials"),
+        "KLA": normalize_aliases("kla"),
+        "Marvell": normalize_aliases("marvell", "marvell technology"),
+        "CrowdStrike": normalize_aliases("crowdstrike"),
+        "MongoDB": normalize_aliases("mongodb"),
+        "Synopsys": normalize_aliases("synopsys"),
+        "Cadence": normalize_aliases("cadence", "cadence design systems"),
+        "Micron": normalize_aliases("micron", "micron technology"),
+        "Lam Research": normalize_aliases("lam research"),
+        "Analog Devices": normalize_aliases("analog devices"),
+        "Datadog": normalize_aliases("datadog"),
+        "Fortinet": normalize_aliases("fortinet"),
+        "Trade Desk": normalize_aliases("trade desk", "the trade desk", "ttd"),
+        "Workday": normalize_aliases("workday"),
+        "Autodesk": normalize_aliases("autodesk"),
+        "Paychex": normalize_aliases("paychex"),
+        "ON Semiconductor": normalize_aliases("on semiconductor", "onsemi"),
+    },
+
+    "Dow Jones": {
+        "Apple": normalize_aliases("apple"),
+        "Microsoft": normalize_aliases("microsoft"),
+        "Amazon": normalize_aliases("amazon"),
+        "Nvidia": normalize_aliases("nvidia"),
+        "Visa": normalize_aliases("visa"),
+        "American Express": normalize_aliases("american express", "amex"),
+        "JPMorgan": normalize_aliases("jpmorgan", "jp morgan", "j.p. morgan"),
+        "Goldman Sachs": normalize_aliases("goldman sachs"),
+        "McDonald's": normalize_aliases("mcdonald's", "mcdonalds"),
+        "Coca-Cola": normalize_aliases("coca-cola", "coca cola"),
+        "Walmart": normalize_aliases("walmart"),
+        "Home Depot": normalize_aliases("home depot"),
+        "Chevron": normalize_aliases("chevron"),
+        "IBM": normalize_aliases("ibm", "international business machines"),
+        "Cisco": normalize_aliases("cisco"),
+        "Salesforce": normalize_aliases("salesforce"),
+        "Johnson & Johnson": normalize_aliases("johnson & johnson", "j&j"),
+        "Merck": normalize_aliases("merck"),
+        "Procter & Gamble": normalize_aliases("procter & gamble", "p&g"),
+        "Disney": normalize_aliases("disney", "walt disney"),
+        "Nike": normalize_aliases("nike"),
+        "Boeing": normalize_aliases("boeing"),
+        "3M": normalize_aliases("3m"),
+        "Amgen": normalize_aliases("amgen"),
+        "Honeywell": normalize_aliases("honeywell"),
+        "Caterpillar": normalize_aliases("caterpillar"),
+        "UnitedHealth": normalize_aliases("unitedhealth", "unitedhealth group"),
+        "Sherwin-Williams": normalize_aliases("sherwin-williams", "sherwin williams"),
+    },
+
+    "DAX": {
+        "SAP": normalize_aliases("sap"),
+        "Siemens": normalize_aliases("siemens"),
+        "Allianz": normalize_aliases("allianz"),
+        "Deutsche Telekom": normalize_aliases("deutsche telekom"),
+        "Mercedes-Benz": normalize_aliases("mercedes-benz", "mercedes benz"),
+        "BMW": normalize_aliases("bmw"),
+        "Volkswagen": normalize_aliases("volkswagen", "vw"),
+        "Porsche": normalize_aliases("porsche"),
+        "Bayer": normalize_aliases("bayer"),
+        "BASF": normalize_aliases("basf"),
+        "Adidas": normalize_aliases("adidas"),
+        "Infineon": normalize_aliases("infineon"),
+        "Munich Re": normalize_aliases("munich re", "muenchener rueck"),
+        "Siemens Energy": normalize_aliases("siemens energy"),
+        "Siemens Healthineers": normalize_aliases("siemens healthineers"),
+        "Rheinmetall": normalize_aliases("rheinmetall"),
+        "Deutsche Bank": normalize_aliases("deutsche bank"),
+        "Commerzbank": normalize_aliases("commerzbank"),
+        "Henkel": normalize_aliases("henkel"),
+        "Beiersdorf": normalize_aliases("beiersdorf"),
+        "Merck KGaA": normalize_aliases("merck kgaa", "merck darmstadt"),
+        "Deutsche Börse": normalize_aliases("deutsche boerse", "deutsche börse"),
+        "Vonovia": normalize_aliases("vonovia"),
+        "E.ON": normalize_aliases("e.on", "eon"),
+        "RWE": normalize_aliases("rwe"),
+        "Continental": normalize_aliases("continental"),
+        "Airbus": normalize_aliases("airbus"),
+        "Puma": normalize_aliases("puma"),
+        "Qiagen": normalize_aliases("qiagen"),
+        "Fresenius": normalize_aliases("fresenius"),
+        "Fresenius Medical Care": normalize_aliases("fresenius medical care", "fmc"),
+        "Heidelberg Materials": normalize_aliases("heidelberg materials", "heidelbergcement"),
+        "Symrise": normalize_aliases("symrise"),
+        "Zalando": normalize_aliases("zalando"),
+    },
+
+    "IBEX 35": {
+        "Inditex": normalize_aliases("inditex", "zara"),
+        "Iberdrola": normalize_aliases("iberdrola"),
+        "Banco Santander": normalize_aliases("banco santander", "santander"),
+        "BBVA": normalize_aliases("bbva"),
+        "CaixaBank": normalize_aliases("caixabank"),
+        "Banco Sabadell": normalize_aliases("banco sabadell", "sabadell"),
+        "Bankinter": normalize_aliases("bankinter"),
+        "Repsol": normalize_aliases("repsol"),
+        "Telefónica": normalize_aliases("telefonica", "telefónica"),
+        "Amadeus": normalize_aliases("amadeus"),
+        "Aena": normalize_aliases("aena"),
+        "Ferrovial": normalize_aliases("ferrovial"),
+        "ACS": normalize_aliases("acs"),
+        "Acciona": normalize_aliases("acciona"),
+        "Cellnex": normalize_aliases("cellnex"),
+        "Grifols": normalize_aliases("grifols"),
+        "Naturgy": normalize_aliases("naturgy"),
+        "Mapfre": normalize_aliases("mapfre"),
+        "Merlin Properties": normalize_aliases("merlin properties", "merlin"),
+        "Redeia": normalize_aliases("redeia", "red electrica", "red eléctrica"),
+        "Indra": normalize_aliases("indra"),
+        "Sacyr": normalize_aliases("sacyr"),
+        "Unicaja": normalize_aliases("unicaja"),
+        "ArcelorMittal": normalize_aliases("arcelormittal"),
+        "Fluidra": normalize_aliases("fluidra"),
+        "Colonial": normalize_aliases("colonial", "inmobiliaria colonial"),
+        "Enagás": normalize_aliases("enagas", "enagás"),
+    },
+
+    "FTSE 100": {
+        "Shell": normalize_aliases("shell"),
+        "HSBC": normalize_aliases("hsbc"),
+        "Unilever": normalize_aliases("unilever"),
+        "AstraZeneca": normalize_aliases("astrazeneca", "astra zeneca"),
+        "BP": normalize_aliases("bp", "british petroleum"),
+        "Glencore": normalize_aliases("glencore"),
+        "Rio Tinto": normalize_aliases("rio tinto"),
+        "BHP": normalize_aliases("bhp"),
+        "Diageo": normalize_aliases("diageo"),
+        "British American Tobacco": normalize_aliases("british american tobacco", "bat"),
+        "Barclays": normalize_aliases("barclays"),
+        "Lloyds": normalize_aliases("lloyds", "lloyds banking group"),
+        "NatWest": normalize_aliases("natwest"),
+        "Standard Chartered": normalize_aliases("standard chartered"),
+        "RELX": normalize_aliases("relx"),
+        "London Stock Exchange Group": normalize_aliases("lseg", "london stock exchange group"),
+        "Compass Group": normalize_aliases("compass group"),
+        "Vodafone": normalize_aliases("vodafone"),
+        "GSK": normalize_aliases("gsk", "glaxosmithkline"),
+        "Rolls-Royce": normalize_aliases("rolls-royce", "rolls royce"),
+        "Tesco": normalize_aliases("tesco"),
+        "Prudential": normalize_aliases("prudential"),
+        "Aviva": normalize_aliases("aviva"),
+        "SSE": normalize_aliases("sse"),
+        "National Grid": normalize_aliases("national grid"),
+        "Experian": normalize_aliases("experian"),
+        "Legal & General": normalize_aliases("legal & general", "legal and general"),
+    },
+
+    "Nikkei": {
+        "Toyota": normalize_aliases("toyota", "toyota motor"),
+        "Sony": normalize_aliases("sony"),
+        "SoftBank": normalize_aliases("softbank", "softbank group"),
+        "Keyence": normalize_aliases("keyence"),
+        "Fast Retailing": normalize_aliases("fast retailing", "uniqlo"),
+        "Mitsubishi UFJ": normalize_aliases("mitsubishi ufj", "mufg"),
+        "Nintendo": normalize_aliases("nintendo"),
+        "Hitachi": normalize_aliases("hitachi"),
+        "Tokyo Electron": normalize_aliases("tokyo electron"),
+        "Honda": normalize_aliases("honda"),
+        "Mitsui": normalize_aliases("mitsui"),
+        "Sumitomo": normalize_aliases("sumitomo"),
+        "Canon": normalize_aliases("canon"),
+        "Nissan": normalize_aliases("nissan"),
+        "Panasonic": normalize_aliases("panasonic"),
+        "Recruit Holdings": normalize_aliases("recruit holdings", "recruit"),
+        "Advantest": normalize_aliases("advantest"),
+        "Mitsubishi Heavy Industries": normalize_aliases("mitsubishi heavy industries", "mhi"),
+        "Shin-Etsu": normalize_aliases("shin-etsu"),
+        "Tokyo Marine": normalize_aliases("tokio marine", "tokyo marine"),
+        "Daiichi Sankyo": normalize_aliases("daiichi sankyo"),
+    },
+
+    "Hang Seng": {
+        "Tencent": normalize_aliases("tencent"),
+        "Alibaba": normalize_aliases("alibaba"),
+        "Meituan": normalize_aliases("meituan"),
+        "Xiaomi": normalize_aliases("xiaomi"),
+        "AIA": normalize_aliases("aia", "aia group"),
+        "HSBC": normalize_aliases("hsbc"),
+        "Hong Kong Exchanges and Clearing": normalize_aliases("hkex", "hong kong exchanges and clearing"),
+        "China Mobile": normalize_aliases("china mobile"),
+        "ICBC": normalize_aliases("icbc", "industrial and commercial bank of china"),
+        "Bank of China": normalize_aliases("bank of china"),
+        "China Construction Bank": normalize_aliases("china construction bank", "ccb"),
+        "JD.com": normalize_aliases("jd.com", "jd"),
+        "Lenovo": normalize_aliases("lenovo"),
+        "BYD": normalize_aliases("byd"),
+        "Geely": normalize_aliases("geely"),
+        "CK Hutchison": normalize_aliases("ck hutchison"),
+        "Sun Hung Kai Properties": normalize_aliases("sun hung kai", "sun hung kai properties"),
+        "Li Auto": normalize_aliases("li auto"),
+        "NIO": normalize_aliases("nio"),
+        "Trip.com": normalize_aliases("trip.com", "ctrip"),
+        "China Life": normalize_aliases("china life"),
+    },
+
+    "Colcap": {
+        "Ecopetrol": normalize_aliases("ecopetrol"),
+        "Bancolombia": normalize_aliases("bancolombia"),
+        "Grupo Aval": normalize_aliases("grupo aval", "aval"),
+        "Grupo Sura": normalize_aliases("grupo sura", "sura"),
+        "Grupo Argos": normalize_aliases("grupo argos", "argos"),
+        "Cementos Argos": normalize_aliases("cementos argos"),
+        "ISA": normalize_aliases("isa", "interconexion electrica", "interconexión eléctrica"),
+        "Celsia": normalize_aliases("celsia"),
+        "Grupo Nutresa": normalize_aliases("grupo nutresa", "nutresa"),
+        "Davivienda": normalize_aliases("davivienda"),
+        "Canacol Energy": normalize_aliases("canacol", "canacol energy"),
+        "Mineros": normalize_aliases("mineros"),
+        "Corficolombiana": normalize_aliases("corficolombiana"),
+        "Terpel": normalize_aliases("terpel"),
+        "Cemex Latam": normalize_aliases("cemex latam"),
+        "EPM": normalize_aliases("epm", "empresas publicas de medellin", "empresas públicas de medellín"),
+        "Avianca": normalize_aliases("avianca"),
+        "Tecnoglass": normalize_aliases("tecnoglass"),
+        "Tigo": normalize_aliases("tigo"),
+        "Claro": normalize_aliases("claro"),
+        "Addi": normalize_aliases("addi"),
+        "Rappi": normalize_aliases("rappi"),
+        "Nu Colombia": normalize_aliases("nu colombia", "nubank colombia"),
+        "BVC": normalize_aliases("bvc", "bolsa de valores de colombia"),
+    },
+
+    "MSCI": {
+        "Apple": normalize_aliases("apple"),
+        "Microsoft": normalize_aliases("microsoft"),
+        "Nvidia": normalize_aliases("nvidia"),
+        "Amazon": normalize_aliases("amazon"),
+        "Alphabet": normalize_aliases("alphabet", "google"),
+        "Meta": normalize_aliases("meta", "meta platforms", "facebook"),
+        "Taiwan Semiconductor": normalize_aliases("tsmc", "taiwan semiconductor", "taiwan semiconductor manufacturing"),
+        "Samsung Electronics": normalize_aliases("samsung", "samsung electronics"),
+        "Tencent": normalize_aliases("tencent"),
+        "Alibaba": normalize_aliases("alibaba"),
+        "Novo Nordisk": normalize_aliases("novo nordisk"),
+        "ASML": normalize_aliases("asml"),
+        "LVMH": normalize_aliases("lvmh"),
+        "Nestlé": normalize_aliases("nestle", "nestlé"),
+        "Roche": normalize_aliases("roche"),
+        "Novartis": normalize_aliases("novartis"),
+        "SAP": normalize_aliases("sap"),
+        "Toyota": normalize_aliases("toyota"),
+        "Sony": normalize_aliases("sony"),
+        "Shell": normalize_aliases("shell"),
+        "HSBC": normalize_aliases("hsbc"),
+        "Siemens": normalize_aliases("siemens"),
+        "AstraZeneca": normalize_aliases("astrazeneca"),
+        "Unilever": normalize_aliases("unilever"),
+    },
+
+    "Russell 2000": {
+        "Crocs": normalize_aliases("crocs"),
+        "Abercrombie & Fitch": normalize_aliases("abercrombie", "abercrombie & fitch"),
+        "Carvana": normalize_aliases("carvana"),
+        "Upstart": normalize_aliases("upstart"),
+        "Plug Power": normalize_aliases("plug power"),
+        "Rocket Lab": normalize_aliases("rocket lab"),
+        "Sirius XM": normalize_aliases("sirius xm"),
+        "Cava": normalize_aliases("cava"),
+        "Sweetgreen": normalize_aliases("sweetgreen"),
+        "SoFi": normalize_aliases("sofi", "sofi technologies"),
+        "Riot Platforms": normalize_aliases("riot", "riot platforms"),
+        "Marathon Digital": normalize_aliases("marathon digital", "mara"),
+        "Super Micro Computer": normalize_aliases("super micro", "super micro computer", "smci"),
+        "Uranium Energy": normalize_aliases("uranium energy", "uec"),
+        "IonQ": normalize_aliases("ionq"),
+        "SoundHound": normalize_aliases("soundhound", "soundhound ai"),
+    },
+
+    "Extra Global / Private / Fintech": {
+        "OpenAI": normalize_aliases("openai"),
+        "Anthropic": normalize_aliases("anthropic"),
+        "Stripe": normalize_aliases("stripe"),
+        "Databricks": normalize_aliases("databricks"),
+        "SpaceX": normalize_aliases("spacex", "space x"),
+        "OpenSea": normalize_aliases("opensea"),
+        "Robinhood": normalize_aliases("robinhood"),
+        "Coinbase": normalize_aliases("coinbase"),
+        "Block": normalize_aliases("block", "square"),
+        "Shopify": normalize_aliases("shopify"),
+        "Mercado Libre": normalize_aliases("mercado libre", "mercadolibre"),
+        "Nubank": normalize_aliases("nubank", "nu holdings"),
+        "Itaú": normalize_aliases("itaú", "itau"),
+        "Petrobras": normalize_aliases("petrobras"),
+        "Vale SA": normalize_aliases("vale sa", "vale"),
+        "LATAM Airlines": normalize_aliases("latam", "latam airlines"),
+        "Falabella": normalize_aliases("falabella"),
+        "Cencosud": normalize_aliases("cencosud"),
+        "Banco do Brasil": normalize_aliases("banco do brasil"),
+    }
+}
+
+
+def build_company_catalog():
+    catalog = defaultdict(lambda: {"aliases": [], "indices": set()})
+
+    for index_name, companies in INDEX_COMPANIES.items():
+        for canonical_name, aliases in companies.items():
+            for alias in aliases:
+                if alias not in catalog[canonical_name]["aliases"]:
+                    catalog[canonical_name]["aliases"].append(alias)
+
+            canonical_lower = canonical_name.strip().lower()
+            if canonical_lower not in catalog[canonical_name]["aliases"]:
+                catalog[canonical_name]["aliases"].append(canonical_lower)
+
+            catalog[canonical_name]["indices"].add(index_name)
+
+    final_catalog = {}
+
+    for canonical_name, data in catalog.items():
+        final_catalog[canonical_name] = {
+            "aliases": sorted(data["aliases"]),
+            "indices": sorted(list(data["indices"]))
+        }
+
+    return final_catalog
+
+
+def build_company_aliases():
+    catalog = build_company_catalog()
+    return {
+        company: info["aliases"]
+        for company, info in catalog.items()
+    }
+
+
+def build_company_to_indices():
+    catalog = build_company_catalog()
+    return {
+        company: info["indices"]
+        for company, info in catalog.items()
+    }
+
+
+COMPANY_CATALOG = build_company_catalog()
+COMPANY_ALIASES = build_company_aliases()
+COMPANY_TO_INDICES = build_company_to_indices()
