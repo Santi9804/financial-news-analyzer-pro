@@ -8,7 +8,7 @@ from datetime import datetime
 # Agrega la raíz del proyecto al path
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "../..")))
 
-from app.db.connection import get_connection
+from app.db.connection import get_connection, create_table
 
 
 def configure_page():
@@ -112,64 +112,60 @@ def load_custom_css():
 
 @st.cache_data
 def load_data():
+    create_table()
+
     conn = get_connection()
     cursor = conn.cursor()
 
-    cursor.execute("""
-        SELECT
-            title,
-            link,
-            content,
-            source,
-            published_at,
-            companies,
-            commodities,
-            raw_materials,
-            indices,
-            currencies,
-            sectors,
-            impact_general,
-            impact_score_general,
-            impact_by_company,
-            impact_by_commodity,
-            impact_by_raw_material,
-            impact_by_index,
-            impact_by_currency,
-            impact_by_sector,
-            company_to_indices
-        FROM news
-        ORDER BY id DESC
-    """)
+    try:
+        cursor.execute("""
+            SELECT
+                title,
+                link,
+                content,
+                source,
+                published_at,
+                companies,
+                commodities,
+                raw_materials,
+                indices,
+                currencies,
+                sectors,
+                impact_general,
+                impact_score_general,
+                impact_by_company,
+                impact_by_commodity,
+                impact_by_raw_material,
+                impact_by_index,
+                impact_by_currency,
+                impact_by_sector
+            FROM news
+            ORDER BY id DESC
+        """)
+        rows = cursor.fetchall()
+    except:
+        rows = []
 
-    rows = cursor.fetchall()
     conn.close()
 
-    df = pd.DataFrame(
-        rows,
-        columns=[
-            "title",
-            "link",
-            "content",
-            "source",
-            "published_at",
-            "companies",
-            "commodities",
-            "raw_materials",
-            "indices",
-            "currencies",
-            "sectors",
-            "impact_general",
-            "impact_score_general",
-            "impact_by_company",
-            "impact_by_commodity",
-            "impact_by_raw_material",
-            "impact_by_index",
-            "impact_by_currency",
-            "impact_by_sector",
-            "company_to_indices"
-        ]
-    )
+    df = pd.DataFrame(rows, columns=[
+        "title","link","content","source","published_at",
+        "companies","commodities","raw_materials","indices",
+        "currencies","sectors","impact_general",
+        "impact_score_general","impact_by_company",
+        "impact_by_commodity","impact_by_raw_material",
+        "impact_by_index","impact_by_currency",
+        "impact_by_sector"
+    ])
 
+    if df.empty:
+        return df
+
+    df = df.fillna("")
+    df["published_at"] = pd.to_datetime(df["published_at"], errors="coerce", utc=True)
+    df["impact_score_general"] = pd.to_numeric(df["impact_score_general"], errors="coerce").fillna(0)
+
+    return df.sort_values(by="published_at", ascending=False)
     for col in df.columns:
         df[col] = df[col].fillna("")
 
