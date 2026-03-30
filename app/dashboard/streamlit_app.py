@@ -1,20 +1,21 @@
 import os
 import sys
+from pathlib import Path
 import streamlit as st
 import pandas as pd
 import json
 from datetime import datetime
+
+# Agrega la raíz del proyecto al path ANTES de importar desde app
+PROJECT_ROOT = Path(__file__).resolve().parents[2]
+if str(PROJECT_ROOT) not in sys.path:
+    sys.path.insert(0, str(PROJECT_ROOT))
 
 from app.db.connection import get_connection, create_table
 from app.services.news_utils import save_news_to_db
 from app.collectors.valora_collector import get_valora_news
 from app.collectors.investing_collector import get_investing_news
 from app.collectors.bloomberg_collector import get_bloomberg_news
-
-# Agrega la raíz del proyecto al path
-sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "../..")))
-
-from app.db.connection import get_connection, create_table
 
 
 def configure_page():
@@ -116,42 +117,6 @@ def load_custom_css():
     """, unsafe_allow_html=True)
 
 
-@st.cache_data
-def load_data():
-    create_table()
-
-    conn = get_connection()
-    cursor = conn.cursor()
-
-    try:
-        cursor.execute("""
-            SELECT
-                title,
-                link,
-                content,
-                source,
-                published_at,
-                companies,
-                commodities,
-                raw_materials,
-                indices,
-                currencies,
-                sectors,
-                impact_general,
-                impact_score_general,
-                impact_by_company,
-                impact_by_commodity,
-                impact_by_raw_material,
-                impact_by_index,
-                impact_by_currency,
-                impact_by_sector
-            FROM news
-            ORDER BY id DESC
-        """)
-        rows = cursor.fetchall()
-    except:
-        rows = []
-
 def auto_load_news_if_empty():
     create_table()
 
@@ -186,28 +151,77 @@ def auto_load_news_if_empty():
 
         if all_news:
             save_news_to_db(all_news)
-            st.cache_data.clear()    
+            st.cache_data.clear()
+
+
+@st.cache_data
+def load_data():
+    create_table()
+
+    conn = get_connection()
+    cursor = conn.cursor()
+
+    try:
+        cursor.execute("""
+            SELECT
+                title,
+                link,
+                content,
+                source,
+                published_at,
+                companies,
+                commodities,
+                raw_materials,
+                indices,
+                currencies,
+                sectors,
+                impact_general,
+                impact_score_general,
+                impact_by_company,
+                impact_by_commodity,
+                impact_by_raw_material,
+                impact_by_index,
+                impact_by_currency,
+                impact_by_sector,
+                company_to_indices
+            FROM news
+            ORDER BY id DESC
+        """)
+        rows = cursor.fetchall()
+    except Exception:
+        rows = []
 
     conn.close()
 
-    df = pd.DataFrame(rows, columns=[
-        "title","link","content","source","published_at",
-        "companies","commodities","raw_materials","indices",
-        "currencies","sectors","impact_general",
-        "impact_score_general","impact_by_company",
-        "impact_by_commodity","impact_by_raw_material",
-        "impact_by_index","impact_by_currency",
-        "impact_by_sector"
-    ])
+    columns = [
+        "title",
+        "link",
+        "content",
+        "source",
+        "published_at",
+        "companies",
+        "commodities",
+        "raw_materials",
+        "indices",
+        "currencies",
+        "sectors",
+        "impact_general",
+        "impact_score_general",
+        "impact_by_company",
+        "impact_by_commodity",
+        "impact_by_raw_material",
+        "impact_by_index",
+        "impact_by_currency",
+        "impact_by_sector",
+        "company_to_indices"
+    ]
+
+    df = pd.DataFrame(rows, columns=columns)
 
     if df.empty:
-        return df
+        empty_df = pd.DataFrame(columns=columns + ["published_at_raw", "impact_score"])
+        return empty_df
 
-    df = df.fillna("")
-    df["published_at"] = pd.to_datetime(df["published_at"], errors="coerce", utc=True)
-    df["impact_score_general"] = pd.to_numeric(df["impact_score_general"], errors="coerce").fillna(0)
-
-    return df.sort_values(by="published_at", ascending=False)
     for col in df.columns:
         df[col] = df[col].fillna("")
 
