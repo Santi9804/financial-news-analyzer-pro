@@ -134,18 +134,28 @@ def auto_load_news_if_empty():
     if count == 0:
         all_news = []
 
+        valora_news = []
+        investing_news = []
+        bloomberg_news = []
+
         try:
-            all_news.extend(get_valora_news())
+            valora_news = get_valora_news()
+            st.info(f"Valora Analitik cargó {len(valora_news)} noticias.")
+            all_news.extend(valora_news)
         except Exception as e:
             st.warning(f"No se pudieron cargar noticias de Valora Analitik: {e}")
 
         try:
-            all_news.extend(get_investing_news())
+            investing_news = get_investing_news()
+            st.info(f"Investing cargó {len(investing_news)} noticias.")
+            all_news.extend(investing_news)
         except Exception as e:
             st.warning(f"No se pudieron cargar noticias de Investing: {e}")
 
         try:
-            all_news.extend(get_bloomberg_news())
+            bloomberg_news = get_bloomberg_news()
+            st.info(f"Bloomberg cargó {len(bloomberg_news)} noticias.")
+            all_news.extend(bloomberg_news)
         except Exception as e:
             st.warning(f"No se pudieron cargar noticias de Bloomberg: {e}")
 
