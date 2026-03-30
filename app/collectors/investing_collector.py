@@ -4,15 +4,12 @@ import json
 import re
 import cloudscraper
 from datetime import datetime
+from urllib.parse import urljoin
 
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..")))
 
 from bs4 import BeautifulSoup
-from app.services.news_utils import (
-    clean_text,
-    build_news_item,
-    save_news_to_db
-)
+from app.services.news_utils import clean_text, build_news_item, save_news_to_db
 from app.db.connection import create_table
 
 URLS = [
@@ -23,7 +20,8 @@ URLS = [
     "https://www.investing.com/news/commodities-news"
 ]
 
-MAX_NEWS = 25
+BASE_URL = "https://www.investing.com"
+MAX_NEWS = 20
 
 HEADERS = {
     "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36",
@@ -35,7 +33,6 @@ HEADERS = {
 
 def extract_published_at(soup):
     try:
-        # 1) <time>
         time_tag = soup.find("time")
         if time_tag:
             datetime_value = time_tag.get("datetime")
@@ -46,7 +43,6 @@ def extract_published_at(soup):
             if text_value and any(char.isdigit() for char in text_value):
                 return text_value
 
-        # 2) Meta tags
         meta_candidates = [
             {"property": "article:published_time"},
             {"name": "article:published_time"},
@@ -61,7 +57,6 @@ def extract_published_at(soup):
             if meta_tag and meta_tag.get("content"):
                 return meta_tag.get("content").strip()
 
-        # 3) JSON-LD
         scripts = soup.find_all("script", type="application/ld+json")
         for script in scripts:
             raw = script.string or script.get_text(strip=True)
@@ -81,9 +76,7 @@ def extract_published_at(soup):
             except Exception:
                 continue
 
-        # 4) Regex sobre todo el HTML
         html = str(soup)
-
         patterns = [
             r'"datePublished"\s*:\s*"([^"]+)"',
             r'"dateModified"\s*:\s*"([^"]+)"',
@@ -106,6 +99,7 @@ def is_valid_investing_link(title, link):
     if not title or not link:
         return False
 
+    title = clean_text(title)
     link_lower = link.lower()
     title_lower = title.lower()
 
@@ -119,7 +113,8 @@ def is_valid_investing_link(title, link):
         "newsletter",
         "login",
         "sign-up",
-        "#"
+        "#",
+        "video"
     ]
 
     for term in banned_terms:
@@ -135,7 +130,7 @@ def is_valid_investing_link(title, link):
     if title_lower in ["read more", "more", "news"]:
         return False
 
-    if "investing.com/news/" not in link_lower:
+    if "/news/" not in link_lower:
         return False
 
     return True
@@ -151,7 +146,9 @@ def is_valid_article_content(content):
         "risk disclosure",
         "all rights reserved",
         "sign up",
-        "advertisement"
+        "advertisement",
+        "by using this site",
+        "terms and conditions"
     ]
 
     for term in banned_content_terms:
@@ -164,60 +161,106 @@ def is_valid_article_content(content):
     return True
 
 
+def extract_text_from_article_soup(soup):
+    selectors = [
+        "div.article_WYSIWYG__O0uhw",
+        "div[class*='article_WYSIWYG']",
+        "div.articlePage",
+        "div.article-body",
+        "div.article-content",
+        "div.main-content",
+        "div.textDiv",
+        "div.entry-content",
+        "div.post-content",
+        "main"
+    ]
+
+    for selector in selectors:
+        block = soup.select_one(selector)
+        if block:
+            paragraphs = block.find_all("p")
+            text = " ".join(p.get_text(" ", strip=True) for p in paragraphs)
+            text = clean_text(text)
+            if len(text) > 120:
+                return text[:2500]
+
+    paragraphs = soup.find_all("p")
+    text = " ".join(p.get_text(" ", strip=True) for p in paragraphs)
+    text = clean_text(text)
+
+    if len(text) > 120:
+        return text[:2500]
+
+    return "Contenido no encontrado"
+
+
 def extract_investing_article_text_and_date(url, scraper):
     try:
-        response = scraper.get(url, headers=HEADERS, timeout=20)
+        response = scraper.get(url, headers=HEADERS, timeout=25)
         print("Status artículo:", response.status_code, "|", url)
         response.raise_for_status()
 
         soup = BeautifulSoup(response.text, "html.parser")
         published_at = extract_published_at(soup)
+        content = extract_text_from_article_soup(soup)
 
-        possible_classes = [
-            "article_WYSIWYG__O0uhw",
-            "WYSIWYG articlePage",
-            "articlePage",
-            "article-body",
-            "article-content",
-            "main-content",
-            "textDiv",
-            "mb-4",
-            "entry-content",
-            "post-content"
-        ]
-
-        for class_name in possible_classes:
-            if " " in class_name:
-                block = soup.find("div", class_=lambda c: c and class_name in c)
-            else:
-                block = soup.find("div", class_=class_name)
-
-            if block:
-                paragraphs = block.find_all("p")
-                text = " ".join(p.get_text(" ", strip=True) for p in paragraphs)
-                text = clean_text(text)
-
-                if len(text) > 120:
-                    return text[:2000], published_at
-
-        paragraphs = soup.find_all("p")
-        text = " ".join(p.get_text(" ", strip=True) for p in paragraphs)
-        text = clean_text(text)
-
-        if len(text) > 120:
-            return text[:2000], published_at
-
-        return "Contenido no encontrado", published_at
+        return content, published_at
 
     except Exception as e:
         print("Error extrayendo artículo:", e)
         return "Error al obtener contenido", ""
 
 
+def normalize_link(href):
+    if not href:
+        return ""
+
+    href = href.strip()
+    if href.startswith("/"):
+        return urljoin(BASE_URL, href)
+
+    return href
+
+
+def get_candidate_title_from_card(card):
+    title_selectors = [
+        "a[data-test='article-title-link']",
+        "a[data-test='article-title']",
+        "h1", "h2", "h3",
+        "a.title",
+        "a"
+    ]
+
+    for selector in title_selectors:
+        node = card.select_one(selector)
+        if node:
+            title = clean_text(node.get_text(" ", strip=True))
+            if len(title) >= 15:
+                return title
+
+    return ""
+
+
+def get_candidate_link_from_card(card):
+    link_selectors = [
+        "a[data-test='article-title-link']",
+        "a[data-test='article-title']",
+        "h1 a", "h2 a", "h3 a",
+        "a"
+    ]
+
+    for selector in link_selectors:
+        node = card.select_one(selector)
+        if node and node.get("href"):
+            return normalize_link(node.get("href"))
+
+    return ""
+
+
 def get_links_from_section(section_url, scraper):
     print(f"\nRevisando sección: {section_url}")
 
-    response = scraper.get(section_url, headers=HEADERS, timeout=20)
+    response = scraper.get(section_url, headers=HEADERS, timeout=25)
     print("Status sección:", response.status_code)
     response.raise_for_status()
 
@@ -225,20 +268,25 @@ def get_links_from_section(section_url, scraper):
     links = []
     seen_in_section = set()
 
-    articles = soup.find_all("a", href=True)
-    print("Cantidad de links encontrados en sección:", len(articles))
+    card_selectors = [
+        "article",
+        "div[data-test='article-item']",
+        "div[class*='article']",
+        "div[class*='news']"
+    ]
 
-    for tag in articles:
-        title = clean_text(tag.get_text(" ", strip=True))
-        href = tag.get("href", "").strip()
+    candidate_cards = []
+    for selector in card_selectors:
+        candidate_cards.extend(soup.select(selector))
 
-        if not href:
-            continue
+    if not candidate_cards:
+        candidate_cards = soup.find_all(["article", "div"])
 
-        if href.startswith("/"):
-            link = f"https://www.investing.com{href}"
-        else:
-            link = href
+    print("Cantidad de bloques candidatos en sección:", len(candidate_cards))
+
+    for card in candidate_cards:
+        title = get_candidate_title_from_card(card)
+        link = get_candidate_link_from_card(card)
 
         if not is_valid_investing_link(title, link):
             continue
@@ -248,6 +296,22 @@ def get_links_from_section(section_url, scraper):
 
         seen_in_section.add(link)
         links.append((title, link))
+
+    if not links:
+        print("No se encontraron links por bloques, probando fallback general...")
+
+        for tag in soup.find_all("a", href=True):
+            title = clean_text(tag.get_text(" ", strip=True))
+            link = normalize_link(tag.get("href"))
+
+            if not is_valid_investing_link(title, link):
+                continue
+
+            if link in seen_in_section:
+                continue
+
+            seen_in_section.add(link)
+            links.append((title, link))
 
     print("Links válidos encontrados en sección:", len(links))
     return links
@@ -316,7 +380,7 @@ def get_investing_news():
         if len(news_list) >= MAX_NEWS:
             break
 
-    print("\nTotal noticias útiles:", len(news_list))
+    print("\nTotal noticias útiles de Investing:", len(news_list))
     return news_list
 
 
